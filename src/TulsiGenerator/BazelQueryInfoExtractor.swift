@@ -158,6 +158,7 @@ final class BazelQueryInfoExtractor: QueuedLogging {
         "--noimplicit_deps",
         "--order_output=no",
         "--noshow_loading_progress",
+        "--experimental_repo_remote_exec",
         "--noshow_progress",
         query
     ])
