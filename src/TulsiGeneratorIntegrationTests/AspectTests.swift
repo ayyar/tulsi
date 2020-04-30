@@ -80,8 +80,8 @@ class TulsiSourcesAspectTests: BazelIntegrationTestCase {
                          "APPLIB_ADDITIONAL_DEFINE",
                          "APPLIB_ANOTHER_DEFINE=2"])
         .hasIncludes(["tulsi_test/ApplicationLibrary/includes",
-                      "_tulsi-includes/x/x/tulsi_test/ApplicationLibrary/includes",
-                      "_tulsi-includes/x/x/"])
+                      "\(PBXTargetGenerator.tulsiIncludesPath)/tulsi_test/ApplicationLibrary/includes",
+                      "\(PBXTargetGenerator.tulsiIncludesPath)/"])
         .hasAttribute(.supporting_files,
                       value: [["is_dir": false,
                                "path": "tulsi_test/ApplicationLibrary/Base.lproj/One.storyboard",
@@ -113,8 +113,8 @@ class TulsiSourcesAspectTests: BazelIntegrationTestCase {
     checker.assertThat("//tulsi_test:XCTest")
         .hasTestHost("//tulsi_test:Application")
         .hasDeploymentTarget(DeploymentTarget(platform: .ios, osVersion: "10.0"))
-        .dependsOn("//tulsi_test:Application")
-        .dependsOn("//tulsi_test:TestLibrary")
+        .dependsTransitivelyOn("//tulsi_test:Application")
+        .dependsTransitivelyOn("//tulsi_test:TestLibrary")
   }
 
   func testExceptionThrown() {
@@ -331,9 +331,9 @@ class TulsiSourcesAspectTests: BazelIntegrationTestCase {
     checker.assertThat("//tulsi_test:XCTest")
         .hasTestHost("//tulsi_test:Application")
         .hasDeploymentTarget(DeploymentTarget(platform: .ios, osVersion: "10.0"))
-        .dependsOn("//tulsi_test:Application")
-        .dependsOn("//tulsi_test:Library")
-        .dependsOn("//tulsi_test:TestLibrary")
+        .dependsTransitivelyOn("//tulsi_test:Application")
+        .dependsTransitivelyOn("//tulsi_test:Library")
+        .dependsTransitivelyOn("//tulsi_test:TestLibrary")
 
     checker.assertThat("//tulsi_test:ApplicationLibrary")
         .dependsOn("//tulsi_test:CoreDataResources")
@@ -369,8 +369,8 @@ class TulsiSourcesAspectTests: BazelIntegrationTestCase {
     checker.assertThat("//tulsi_test:ApplicationLibrary")
       .hasSources(["tulsi_test/Library/srcs/main.m"])
       .hasIncludes(["tulsi_test/Library/includes/one/include",
-                    "_tulsi-includes/x/x/tulsi_test/Library/includes/one/include",
-                    "_tulsi-includes/x/x/"])
+                    "\(PBXTargetGenerator.tulsiIncludesPath)/tulsi_test/Library/includes/one/include",
+                    "\(PBXTargetGenerator.tulsiIncludesPath)/"])
 
     checker.assertThat("//tulsi_test:WatchApplication")
       .dependsOn("//tulsi_test:WatchExtension")
@@ -564,6 +564,25 @@ class InfoChecker {
       return self
     }
 
+    /// Asserts that the contextual RuleEntry is linked to a rule identified by the given
+    /// targetLabel as a transitive dependency.
+    @discardableResult
+    func dependsTransitivelyOn(_ targetLabel: String, line: UInt = #line) -> Context {
+      guard let ruleEntry = ruleEntry else { return self }
+      let label = BuildLabel(targetLabel)
+      var ruleEntries = [ruleEntry]
+      while true {
+        guard let entry = ruleEntries.popLast() else { break }
+        guard !entry.dependencies.contains(label) else { return self }
+
+        ruleEntries.append(contentsOf: entry.dependencies.compactMap {
+          ruleEntryMap.ruleEntry(buildLabel: $0, depender: entry)
+        })
+      }
+      XCTFail("\(ruleEntry) must transitively depend on \(targetLabel)", line: line)
+      return self
+    }
+
     /// Asserts that the contextual RuleEntry contains the given list of sources (but may have
     /// others as well).
     @discardableResult
@@ -684,19 +703,22 @@ class InfoChecker {
       let paths = Set(includes.map { (path, recursive) -> String in
         return path
       })
-      XCTAssertEqual(paths, value, line: line)
+      // The CcCompilationContext migration adds "." to the include paths. We filter that out
+      // to make the test robust against the change.  See
+      // https://github.com/bazelbuild/bazel/issues/10674 for more details.
+      XCTAssertEqual(paths.filter({ $0 != "."}), value, line: line)
       return self
     }
 
     /// Asserts that the contextual RuleEntry has an attribute with the given name and value.
     @discardableResult
-    func hasObjcDefines(_ value: [String], line: UInt = #line) -> Context {
+    func hasObjcDefines(_ value: Set<String>, line: UInt = #line) -> Context {
       guard let ruleEntry = ruleEntry else { return self }
       guard let defines = ruleEntry.objcDefines else {
         XCTFail("\(ruleEntry) expected to have defines", line: line)
         return self
       }
-      XCTAssertEqual(defines, value, line: line)
+      XCTAssertEqual(Set(defines), value, line: line)
       return self
     }
 

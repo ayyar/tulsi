@@ -75,11 +75,7 @@ public enum TulsiOptionKey: String {
       PreBuildPhaseRunScript,
 
       // Custom build phase run script that runs after bazel build.
-      PostBuildPhaseRunScript,
-
-      // When building an iOS app with a companion watchOS app, the default architecture for the
-      // watchOS app will be armv7k. This option overrides the default and uses arm64_32 instead.
-      UseArm64_32
+      PostBuildPhaseRunScript
 
   // Options for build invocations.
   case BazelBuildOptionsDebug,
@@ -324,8 +320,7 @@ public class TulsiOptionSet: Equatable {
     addBoolOption(.ImprovedImportAutocompletionFix, .Generic, true)
     addBoolOption(.GenerateRunfiles, .Generic, false)
     addBoolOption(.ProjectPrioritizesSwift, .Generic, false)
-    addBoolOption(.UseArm64_32, .Generic, false)
-    addBoolOption(.SwiftForcesdSYMs, .Generic, true)
+    addBoolOption(.SwiftForcesdSYMs, .Generic, false)
     addBoolOption(.TreeArtifactOutputs, .Generic, true)
 
     let defaultIdentifier = PlatformConfiguration.defaultConfiguration.identifier
@@ -341,7 +336,7 @@ public class TulsiOptionSet: Equatable {
     // List matches the available options for the 'C++ Language Dialect' setting in XCode 10.2.1 and 11.
     // Currently compiler default is equivalent to GNU++98 (Xcode 10.2.1 and 11)
     let cppLanguageStandards = ["compiler-default", "c++98", "gnu++98", "c++11", "gnu++11", "c++14", "gnu++14", "c++17", "gnu++17"]
-    addStringEnumOption(.CLANG_CXX_LANGUAGE_STANDARD, .BuildSetting, "c++11",  cppLanguageStandards)
+    addStringEnumOption(.CLANG_CXX_LANGUAGE_STANDARD, .BuildSetting, "gnu++17",  cppLanguageStandards)
 
     addStringOption(.PreBuildPhaseRunScript, [.TargetSpecializable])
     addStringOption(.PostBuildPhaseRunScript, [.TargetSpecializable])
